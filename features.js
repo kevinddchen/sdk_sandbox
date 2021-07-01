@@ -2,7 +2,7 @@ const iframe = document.getElementById('showcase-iframe');
 const curr_pos_text = document.getElementById('curr_pos');
 const save_pos_text = document.getElementById('save_pos');
 
-const sdkKey = '3nuu1ekiezi63rua0wy7tcmub';
+const sdkKey = 'w766rytyif2s4dfetxhsc3hgd';
 const modelSID = 'SxQL3iGyoDo';
 
 function pointToString(point) {
