@@ -1,7 +1,8 @@
 const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
-const key = '3nuu1ekiezi63rua0wy7tcmub';
+//const key = '3nuu1ekiezi63rua0wy7tcmub';
+const key = 'q44m20q8yk81yi0qgixrremda';
 
 function pointToString(point) {
   var x = point.x.toFixed(2);
