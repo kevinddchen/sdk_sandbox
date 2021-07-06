@@ -1,7 +1,7 @@
 const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
-//const key = '3nuu1ekiezi63rua0wy7tcmub';
-const key = 'e5mzs2ykckg3m4ih104w6i5gb';
+const sweep_pos = document.getElementById('sweep_pos');
+const key = '3nuu1ekiezi63rua0wy7tcmub';
 
 function pointToString(point) {
   var x = point.x.toFixed(2);
@@ -24,8 +24,17 @@ showcase.addEventListener('load', async function() {
     console.log('%cSDK Connected!', 'background: #333333; color: #00dd00');
     console.log(sdk);
 
-    sdk.Pointer.intersection.subscribe(function(intersection) {
-        point_pos.innerHTML = `pointer position: ${pointToString(intersection.position)}`;
+    sdk.Sweep.current.subscribe(function(currSweep) {
+        sweep_pos.innerHTML = `current position: ${pointToString(currSweep.position)}`;
     });
+
+    sdk.Pointer.intersection.subscribe(function(interData) {
+        point_pos.innerHTML = `pointer position: ${pointToString(interData.position)}`;
+    });
+
+    sdk.Mattertag.getData().then(function(mattertags) {
+        console.log(mattertags)
+    });
+
 });
 
