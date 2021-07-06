@@ -2,7 +2,7 @@
 
 Here I am using SDK Bundle, but it is very similar to the SDK for Embeds.
 
-<a href="index.html">index.html</a> contains the basic webpage.
+<a href="index.html">index.html</a> contains the basic webpage---very simple, nothing much to see here.
 <a href="index.js">index.js</a> contains the Javascript.
 
 I think Github hosts the `main` branch to the domain name <a href="https://kevinddchen.github.io/">kevinddchen.github.io</a>. 
