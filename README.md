@@ -7,8 +7,7 @@ Github hosts the branch `main` to the domain name <a href="https://kevinddchen.g
 - <a href="index.html">index.html</a> contains the basic webpage---very simple, nothing much to see here.
 - <a href="index.js">index.js</a> contains the Javascript that interacts with the Matterport SDK.
 
-There are a couple options to test out features:
-- Host locally: run `python3 -m http.server` on command line in your local directory, and then navigate to `localhost:8000` in your web browser.
-- Fork this repo. You will just need your own production SDK key to host on your domain.
-- Create your own branch and develop there. I can change the site to host any branch, not just `main`.
-- Commit directly to the main branch if you want to see your changes instantaneously. I don't mind.
+There are two options to test out features during development:
+- Host locally: run `python3 -m http.server` on command line in your local directory, and then navigate to `localhost:8000` in your web browser. Remember to <em>hard refresh</em> each time!
+- Create your own branch and develop there. The site can host any branch, not just `main`.
+Try not to commit directly to `main`.
