@@ -1,8 +1,7 @@
+const model_sid = 'CDnv6RJDQ3d';
 const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
-const key1 = 'q44m20q8yk81yi0qgixrremda';
-const key2 = 'e0iyprwgd7e7mckrhei7bwzza';
 
 function pointToString(point) {
     var x = point.x.toFixed(2);
@@ -12,16 +11,26 @@ function pointToString(point) {
     return `(${x}, ${y}, ${z})`;
 }
 
+// check if domain is `kevinddchen.github.io` or `localhost`
+let key;
+const domain = document.location.hostname
+if (domain == 'localhost') {
+    key = 'e0iyprwgd7e7mckrhei7bwzza';
+} else if (domain == 'kevinddchen.github.io') {
+    key = 'q44m20q8yk81yi0qgixrremda';
+} else {
+    console.log('Invalid domain name: '+domain)
+}
+showcase.src='bundle/showcase.html?m=CDnv6RJDQ3d&play=1&qs=1&applicationKey='+key;
+
+
+
+// --- START OF EMBEDDING ---
+
 showcase.addEventListener('load', async function() {
     let sdk;
     try {
-        try {
-            // try to host on `kevinddchen.github.io`
-            sdk = await showcase.contentWindow.MP_SDK.connect(showcase, key1);
-        } catch {
-            // try to host on `localhost`
-            sdk = await showcase.contentWindow.MP_SDK.connect(showcase, key2);
-        }
+        sdk = await showcase.contentWindow.MP_SDK.connect(showcase, key);
     }
     catch(e) {
         console.error(e);
