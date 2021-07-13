@@ -15,8 +15,8 @@ function distance(p1, p2) {
     return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2);
 }
 
-function binaryInsert(arr, x) {
-    // Insert x into sorted array
+function binarySearch(arr, x) {
+    // Return index that x should be inserted into arr (which is sorted in increasing order)
     // TODO: use linked list instead of array for performance?
     var i = 0,
         j = arr.length,
@@ -26,39 +26,35 @@ function binaryInsert(arr, x) {
         mid = Math.floor((i+j)/2);
         y = arr[mid];
         if (x == y) {
-        		i = mid;
-        		break;
+        	return mid;
         } else if (x < y) {
             j = mid;
         } else {
             i = mid+1;
         }
     }
-    arr.splice(i, 0, x);
+    return i;
 }
 
-function createGraph(sweeps) {
+function createGraph(sweeps, sweep_positions) {
     // Given list of sweeps, return graph adjacency list.
-    // Returns: adjList[sweep_a_uuid][sweep_b_uuid] -> distance as float
-    // ! Note: assumes graph is undirected, i.e. if A is a neighbor of B, then B is a neighbor of A !
+    // Returns: adjList[sweep_a_uuid][sweep_b_uuid] -> float (representing distance in meters)
     const adjList = {};
-    const positions = {}; // keep track of sweep positions
     for (let i=0; i<sweeps.length; i++) {
-        const swl_a = sweeps[i];
-        adjList[swl_a.sid] = {};
-        positions[swl_a.sid] = swl_a.position;
-
-        const neighbors = swl_a.neighbors;
+        const sweep_a = sweeps[i];
+        adjList[sweep_a.sid] = {};
+        const neighbors = sweep_a.neighbors;
         for (let j=0; j<neighbors.length; j++) {
-            const swl_b_sid = neighbors[j];
-            if (swl_b_sid in adjList) { // if sweep already visited, we know its position
-                const d = distance(swl_a.position, positions[swl_b_sid]);
-                adjList[swl_a.sid][swl_b_sid] = d;
-                adjList[swl_b_sid][swl_a.sid] = d;
-            }
+            const sweep_b_sid = neighbors[j];
+            const d = distance(sweep_a.position, sweep_positions[sweep_b_sid]);
+            adjList[sweep_a.sid][sweep_b_sid] = d;
         }
     }
     return adjList;
+}
+
+function dijkstra(swl_a_sid, swl_b_sid, adjList) {
+    
 }
 
 // ----------------------------------------------------------------------------
@@ -92,11 +88,12 @@ showcase.addEventListener('load', async function() {
     }
 
     // create node graph
-    let sweeps;
-    let adjList;
-    sdk.Model.getData().then( function(data) {
-        sweeps = data.sweeps;
-        adjList = createGraph(data.sweeps);
+    const sweep_positions = {}; // sweep_positions[sweep_sid] -> Vector3
+    let adjList; // adjList[sweep_a_sid][sweep_b_sid] -> float (representing distance in meters)
+    sdk.Model.getData().then( data => {
+        data.sweeps.map( x => {sweep_positions[x.sid] = x.position});
+        console.log(sweep_positions);
+        adjList = createGraph(data.sweeps, sweep_positions);
         console.log(adjList);
     });
     
