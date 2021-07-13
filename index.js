@@ -15,6 +15,28 @@ function distance(p1, p2) {
     return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2);
 }
 
+function binaryInsert(arr, x) {
+    // Insert x into sorted array
+    // TODO: use linked list instead of array for performance?
+    var i = 0,
+        j = arr.length,
+        mid,
+        y;
+    while (i < j) {
+        mid = Math.floor((i+j)/2);
+        y = arr[mid];
+        if (x == y) {
+        		i = mid;
+        		break;
+        } else if (x < y) {
+            j = mid;
+        } else {
+            i = mid+1;
+        }
+    }
+    arr.splice(i, 0, x);
+}
+
 function createGraph(sweeps) {
     // Given list of sweeps, return graph adjacency list.
     // Returns: adjList[sweep_a_uuid][sweep_b_uuid] -> distance as float
