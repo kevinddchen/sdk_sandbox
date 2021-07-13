@@ -18,20 +18,21 @@ function distance(p1, p2) {
 function createGraph(sweeps) {
     // Given list of sweeps, return graph adjacency list.
     // Returns: adjList[sweep_a_uuid][sweep_b_uuid] -> distance as float
+    // ! Note: assumes graph is undirected, i.e. if A is a neighbor of B, then B is a neighbor of A !
     const adjList = {};
     const positions = {}; // keep track of sweep positions
     for (let i=0; i<sweeps.length; i++) {
         const swl_a = sweeps[i];
-        adjList[swl_a.uuid] = {};
-        positions[swl_a.uuid] = swl_a.position;
+        adjList[swl_a.sid] = {};
+        positions[swl_a.sid] = swl_a.position;
 
         const neighbors = swl_a.neighbors;
         for (let j=0; j<neighbors.length; j++) {
-            const swl_b_uuid = neighbors[j];
-            if (swl_b_uuid in adjList) { // if sweep already visited, we know its position
-                const d = distance(swl_a.position, positions[swl_b_uuid]);
-                adjList[swl_a.uuid][swl_b_uuid] = d;
-                adjList[swl_b_uuid][swl_a.uuid] = d;
+            const swl_b_sid = neighbors[j];
+            if (swl_b_sid in adjList) { // if sweep already visited, we know its position
+                const d = distance(swl_a.position, positions[swl_b_sid]);
+                adjList[swl_a.sid][swl_b_sid] = d;
+                adjList[swl_b_sid][swl_a.sid] = d;
             }
         }
     }
@@ -45,7 +46,7 @@ const model_sid = 'CDnv6RJDQ3d';
 
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
-const domain = document.location.hostname
+const domain = document.location.hostname;
 if (domain == 'localhost') {
     key = 'e0iyprwgd7e7mckrhei7bwzza';
 } else if (domain == 'kevinddchen.github.io') {
@@ -55,7 +56,6 @@ if (domain == 'localhost') {
 }
 showcase.src='bundle/showcase.html?m='+model_sid+'&play=1&qs=1&applicationKey='+key;
 
-// --- START OF EMBEDDING ---
 showcase.addEventListener('load', async function() {
 
     // connect to SDK
@@ -81,7 +81,9 @@ showcase.addEventListener('load', async function() {
     // track current sweep position
     sdk.Sweep.current.subscribe(function(currSweep) {
         sweep_pos.innerHTML = `current position: ${pointToString(currSweep.position)}`;
-        console.log(currSweep.uuid);
+        if (currSweep.sid !== '') {
+            console.log(currSweep.uuid);
+        }
     });
 
     // track pointer position
