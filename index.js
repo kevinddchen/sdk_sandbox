@@ -128,54 +128,59 @@ if (domain == 'localhost') {
 }
 showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
 
-// Path segment component factory
+// Path component factory
 
 /**
- * Requires two sweep objects to connect
+ * Draws a smooth elongated tube along the given path
  */
-function Segment() {
+function Path() {
     this.inputs = {
         visible: false,
-        sweeps: [], // 2 sweep objects to connect
-        width: 0.3,
+        path: [], // positions on path
+        radius: 0.15,
         color: 0x00ff00,
         opacity: 0.5,
         heightOffset: -1,
+        stepMultiplier: 5,
     };
  
-    this.onInit = function() {
-        // if not 2 sweeps or if any sweep is undefined, return
-        if (this.inputs.sweeps.length != 2 || !this.inputs.sweeps.every(s => !!s)) return;
+    this.onInit = async function() {
+
+        const { path,
+                radius,
+                heightOffset,
+                opacity, color,
+                stepMultiplier } = this.inputs;
+
+        // check if path is long enough and no undefined points
+        if (path.length < 2 || !path.every(p => !!p)) return;
+        
         let THREE = this.context.three;
 
-        const vectors = this.inputs.sweeps.map(sweep => new THREE.Vector3(sweep.x, sweep.y, sweep.z));
+        const points = path.map(p => new THREE.Vector3(p.x, p.y+heightOffset, p.z));
+        const spline = new THREE.CatmullRomCurve3(points);
 
-        const v = new THREE.Vector3().addVectors(vectors[1], vectors[0].clone().negate());
-        const length = v.length();
+        const extrudeSettings = {
+            steps: stepMultiplier * path.length,
+            bevelEnabled: false,
+            extrudePath: spline,
+        };
 
-        // plane pivot is center, move to midpoint of sweep vector
-        const pos = vectors[0].clone().addScaledVector(v, 0.5);
-        const geometry = new THREE.PlaneGeometry(this.inputs.width, length);
+        // Shape to extrude
+        const arcShape = new THREE.Shape()
+            .absarc( 0, 0, radius, 0, Math.PI * 2 );
+        
+        const extrudeGeometry = new THREE.ExtrudeGeometry( arcShape, extrudeSettings );
         
         this.material = new THREE.MeshBasicMaterial({
-            color: this.inputs.color,
+            color: color,
             transparent: true,
-            opacity: this.inputs.opacity,
-            side: THREE.DoubleSide,
+            opacity: opacity,
         });
-        
-        const segment = new THREE.Mesh(geometry, this.material);
-        
-        segment.position.set(...(pos.toArray()));
-        segment.position.y += this.inputs.heightOffset;
 
-        const zRot = (Math.PI/2) - Math.atan(v.y / v.z);
-        const yRot = Math.atan(v.x / v.z);
+        const pathMesh = new THREE.Mesh(extrudeGeometry, this.material)
 
-        segment.rotateY(yRot);
-        segment.rotateX(zRot);
-
-        this.outputs.objectRoot = segment;
+        this.outputs.objectRoot = pathMesh;
     };
  
     this.onEvent = function(type, data) {
@@ -192,33 +197,31 @@ function Segment() {
     };
 }
 
-function SegmentFactory() {
-    return new Segment();
+function PathFactory() {
+    return new Path();
 }
 
 // Path rendering
 
 /**
- * Renders the given path as a collection of line segments
+ * Renders the given path
  * @param {MP_SDK} sdk The active sdk object
- * @param {INode[]} activeNodes A list of active nodes in order to keep track of them
- *                              and start/stop/destroy when needed
+ * @param {INode[]} node Variable to track active node
  * @param {*} sweepData A mapping of ALL sweep ids to their positions
  * @param {string} sweepIds A list of sweep IDs (the path)
  */
-async function renderPath(sdk, activeNodes, sweepData, sweepIds) {
+async function renderPath(sdk, node, sweepData, sweepIds) {
     // if anything is undefined or there is no multi-sweep path, return
     if (!sweepData || !sweepIds || sweepIds.length < 2) return;
 
-    // start at second sweep because we're looking back
-    for (let i = 1; i < sweepIds.length; i++) {
-        const node = await sdk.Scene.createNode();
-        node.addComponent('segment', {
-            sweeps: [sweepData[sweepIds[i-1]], sweepData[sweepIds[i]]],
-        });
-        node.start();
-        activeNodes.push(node);
-    }
+    node.addComponent('path', {
+        path: sweepIds.map(id => sweepData[id]),
+        opacity: 0.6,
+        radius: 0.08,
+        stepMultiplier: 10,
+        color: 0x8df763,
+    });
+    node.start();
 }
 
 // Showcase runtime code
@@ -245,11 +248,12 @@ showcase.addEventListener('load', async function() {
         console.log("Graph of sweep distances:", adjList);
     });
     
-    sdk.Scene.register('segment', SegmentFactory); // register component
-    let activeNodes = []; // track all active nodes
+    sdk.Scene.register('path', PathFactory); // register component
+
+    let node; // variable to track active node
 
     // track current sweep position
-    sdk.Sweep.current.subscribe(function(currSweep) {
+    sdk.Sweep.current.subscribe(async function(currSweep) {
         sweep_pos.innerHTML = `current position: ${pointToString(currSweep.position)}`;
         if (currSweep.sid !== '') {
             console.log(`current sweep SID: ${currSweep.sid}`);
@@ -257,10 +261,10 @@ showcase.addEventListener('load', async function() {
             // pathfinding
             const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
             const path = findShortestPath(currSweep.sid, endSweepId, adjList);
-            // clear all active nodes
-            activeNodes.forEach(node => node.stop());
-            activeNodes = [];
-            renderPath(sdk, activeNodes, sweepPositions, path);
+
+            if (node) node.stop();
+            node = await sdk.Scene.createNode();
+            renderPath(sdk, node, sweepPositions, path);
         }
     });
 
