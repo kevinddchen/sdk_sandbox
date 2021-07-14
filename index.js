@@ -2,6 +2,24 @@ const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
 
+// --- Params ---
+const modelSID = 'CDnv6RJDQ3d';
+const VERT_THRESHOLD = 1.0; // connect neighboring sweeps whose horizontal separation is less than this amount
+
+// Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
+let key;
+const domain = document.location.hostname;
+if (domain == 'localhost') {
+    key = 'e0iyprwgd7e7mckrhei7bwzza';
+} else if (domain == 'kevinddchen.github.io') {
+    key = 'q44m20q8yk81yi0qgixrremda';
+} else {
+    console.log('Invalid domain name: '+domain)
+}
+showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
+
+// ----------------------------------------------------------------------------
+
 /**
  * Convenience function for printing points.
  */
@@ -50,9 +68,10 @@ function createGraph(sweeps) {
  * @param {string} a_sid SID of starting sweep
  * @param {string} b_sid SID of ending sweep
  * @param {*} adjList Graph of sweep distances, as returned by `createGraph`
+ * @param {*} sweepPositions Hash table of sweep positions
  * @returns Path represented by list of sweep SIDs (string) in reverse order, i.e. [b_sid, ..., a_sid]
  */
-function findShortestPath(a_sid, b_sid, adjList) {
+function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
     // check SIDs are valid
     if (adjList[a_sid] === undefined || adjList[b_sid] === undefined) {
         console.error("Sweep SID(s) is invalid.");
@@ -91,6 +110,9 @@ function findShortestPath(a_sid, b_sid, adjList) {
         for (let i=0; i<neighbor_sids.length; i++) {
             const sid = neighbor_sids[i];
             const dist = adjList[min_sid][sid];
+            if (Math.abs(sweepPositions[min_sid].y - sweepPositions[sid].y) > VERT_THRESHOLD) {
+                continue; // do not connect sweeps separated by 1 m vertically
+            }
             if (sid in ht) { // if sweep has been encountered
                 if (!ht[sid].visited && (ht[sid].distance > min_dist+dist)) { // if not visited, update parent and distance
                     ht[sid].parent = min_sid;
@@ -113,22 +135,7 @@ function findShortestPath(a_sid, b_sid, adjList) {
 
 // ----------------------------------------------------------------------------
 
-// Put model SID here
-const modelSID = 'CDnv6RJDQ3d';
-
-// Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
-let key;
-const domain = document.location.hostname;
-if (domain == 'localhost') {
-    key = 'e0iyprwgd7e7mckrhei7bwzza';
-} else if (domain == 'kevinddchen.github.io') {
-    key = 'q44m20q8yk81yi0qgixrremda';
-} else {
-    console.log('Invalid domain name: '+domain)
-}
-showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
-
-// Path component factory
+// Path segment component factory
 
 /**
  * Draws a smooth elongated tube along the given path
@@ -240,7 +247,7 @@ showcase.addEventListener('load', async function() {
     }
 
     // create node graph
-    const sweepPositions = {}; // object keeping track of sid: position pairs
+    const sweepPositions = {}; // hash table keeping track of sweep positions: `sweepPositions[sweep_sid] -> Vector3`
     let adjList; // see `createGraph` for usage
     sdk.Model.getData().then( data => {
         data.sweeps.map( x => {sweepPositions[x.sid] = x.position});
@@ -260,7 +267,7 @@ showcase.addEventListener('load', async function() {
 
             // pathfinding
             const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
-            const path = findShortestPath(currSweep.sid, endSweepId, adjList);
+            const path = findShortestPath(currSweep.sid, endSweepId, adjList, sweepPositions);
 
             if (node) node.stop();
             node = await sdk.Scene.createNode();
