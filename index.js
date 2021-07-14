@@ -253,13 +253,15 @@ showcase.addEventListener('load', async function() {
         sweep_pos.innerHTML = `current position: ${pointToString(currSweep.position)}`;
         if (currSweep.sid !== '') {
             console.log(`current sweep SID: ${currSweep.sid}`);
+
+            // pathfinding
+            const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
+            const path = findShortestPath(currSweep.sid, endSweepId, adjList);
+            // clear all active nodes
+            activeNodes.forEach(node => node.stop());
+            activeNodes = [];
+            renderPath(sdk, activeNodes, sweepPositions, path);
         }
-        const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
-        const path = findShortestPath(currSweep.sid, endSweepId, adjList);
-        // clear all active nodes
-        activeNodes.forEach(node => node.stop());
-        activeNodes = [];
-        renderPath(sdk, activeNodes, sweepPositions, path);
     });
 
     // track pointer position
