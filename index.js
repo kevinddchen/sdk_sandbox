@@ -135,6 +135,101 @@ if (domain == 'localhost') {
 }
 showcase.src='bundle/showcase.html?m='+model_sid+'&play=1&qs=1&applicationKey='+key;
 
+// Path segment component factory
+
+/**
+ * Requires two sweep objects to connect
+ */
+function Segment() {
+    this.inputs = {
+        visible: false,
+        sweeps: [], // 2 sweep objects to connect
+        width: 0.3,
+        color: 0x00ff00,
+        opacity: 0.5,
+        heightOffset: -1,
+    };
+ 
+    this.onInit = function() {
+        // if not 2 sweeps or if any sweep is undefined, return
+        if (this.inputs.sweeps.length != 2 || !this.inputs.sweeps.every(s => !!s)) return;
+        let THREE = this.context.three;
+
+        const vectors = this.inputs.sweeps.map(sweep => new THREE.Vector3(sweep.x, sweep.y, sweep.z));
+
+        const v = new THREE.Vector3().addVectors(vectors[1], vectors[0].clone().negate());
+        const length = v.length();
+
+        // plane pivot is center, move to midpoint of sweep vector
+        const pos = vectors[0].clone().addScaledVector(v, 0.5);
+        const geometry = new THREE.PlaneGeometry(this.inputs.width, length);
+        
+        this.material = new THREE.MeshBasicMaterial({
+            color: this.inputs.color,
+            transparent: true,
+            opacity: this.inputs.opacity,
+            side: THREE.DoubleSide,
+        });
+        
+        const segment = new THREE.Mesh(geometry, this.material);
+        
+        segment.position.set(...(pos.toArray()));
+        segment.position.y += this.inputs.heightOffset;
+
+        const zRot = (Math.PI/2) - Math.atan(v.y / v.z);
+        const yRot = Math.atan(v.x / v.z);
+
+        segment.rotateY(yRot);
+        segment.rotateX(zRot);
+
+        this.outputs.objectRoot = segment;
+    };
+ 
+    this.onEvent = function(type, data) {
+    }
+ 
+    this.onInputsUpdated = function(previous) {
+    };
+ 
+    this.onTick = function(tickDelta) {
+    };
+ 
+    this.onDestroy = function() {
+        this.material.dispose();
+    };
+}
+
+function SegmentFactory() {
+    return new Segment();
+}
+
+// Path rendering
+
+/**
+ * Renders the given path as a collection of line segments
+ * @param {MP_SDK} sdk The active sdk object
+ * @param {INode[]} activeNodes A list of active nodes in order to keep track of them
+ *                              and start/stop/destroy when needed
+ * @param {*} sweepData A mapping of ALL sweep ids to their positions
+ * @param {string} sweepIds A list of sweep IDs (the path)
+ */
+async function renderPath(sdk, activeNodes, sweepData, sweepIds) {
+    // if anything is undefined or there is no multi-sweep path, return
+    if (!sweepData || !sweepIds || sweepIds.length < 2) return;
+
+    // start at second sweep because we're looking back
+    for (let i = 1; i < sweepIds.length; i++) {
+        const node = await sdk.Scene.createNode();
+        node.addComponent('segment', {
+            sweeps: [sweepData[sweepIds[i-1]], sweepData[sweepIds[i]]],
+        });
+        node.start();
+        activeNodes.push(node);
+    }
+}
+
+// Showcase runtime code
+
 showcase.addEventListener('load', async function() {
 
     // connect to SDK
@@ -158,12 +253,21 @@ showcase.addEventListener('load', async function() {
         console.log("Graph of sweep distances:", adjList);
     });
     
+    sdk.Scene.register('segment', SegmentFactory); // register component
+    let activeNodes = []; // track all active nodes
+
     // track current sweep position
     sdk.Sweep.current.subscribe(function(currSweep) {
         sweep_pos.innerHTML = `current position: ${pointToString(currSweep.position)}`;
         if (currSweep.sid !== '') {
             console.log(`current sweep SID: ${currSweep.sid}`);
         }
+        const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
+        const path = findShortestPath(currSweep.sid, endSweepId, adjList);
+        // clear all active nodes
+        activeNodes.forEach(node => node.stop());
+        activeNodes = [];
+        renderPath(sdk, activeNodes, sweep_positions, path);
     });
 
     // track pointer position
