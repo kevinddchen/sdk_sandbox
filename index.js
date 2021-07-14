@@ -2,34 +2,29 @@ const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
 
+/**
+ * Convenience function for printing points.
+ */
 function pointToString(point) {
     var x = point.x.toFixed(2);
     var y = point.y.toFixed(2);
     var z = point.z.toFixed(2);
-
     return `(${x}, ${y}, ${z})`;
 }
 
+/**
+ * Euclidean distance between two points.
+ */
 function distance(p1, p2) {
-    /* Euclidean distance between two points.
-
-    Args
-        p1 (Vector3): First point
-        p2 (Vector3): Second point
-    Returns
-        (float): Euclidean distance in meters
-    */
     return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2);
 }
 
+/**
+ * Generate graph of sweep distances. Assumes graph is undirected.
+ * @param {*} sweeps List of sweeps, as returned by `sdk.Model.getData().sweeps`
+ * @returns The distance between two neighboring sweeps is obtained by `adjList[sweep_a_sid][sweep_b_sid]`
+ */
 function createGraph(sweeps) {
-    /* Generate graph of sweep distances. Assumes graph is undirected.
-
-    Args
-        sweeps: List of sweeps, as returned by `sdk.Model.getData().sweeps`
-    Returns
-        adjList (object): The distance between two neighboring sweeps is obtained by `adjList[sweep_a_sid][sweep_b_sid]`
-    */
     const adjList = {};
     const position_cache = {}; // keep track of encountered sweep positions
     for (let i=0; i<sweeps.length; i++) {
@@ -50,30 +45,28 @@ function createGraph(sweeps) {
     return adjList;
 }
 
+/**
+ * Find shortest path between two sweeps, connected by valid movements.
+ * @param {string} a_sid SID of starting sweep
+ * @param {string} b_sid SID of ending sweep
+ * @param {*} adjList Graph of sweep distances, as returned by `createGraph`
+ * @returns Path represented by list of sweep SIDs (string) in reverse order, i.e. [b_sid, ..., a_sid]
+ */
 function findShortestPath(a_sid, b_sid, adjList) {
-    /* Find shortest path between two sweeps, connected by valid movements.
-
-    Args
-        a_sid (string): SID of starting sweep
-        b_sid (string): SID of ending sweep
-        adjList: Graph of sweep distances, as returned by `createGraph`
-    Returns
-        (list of strings): List of SIDs in reverse order, [b_sid, ..., a_sid]
-    */
-        
     // check SIDs are valid
     if (adjList[a_sid] === undefined || adjList[b_sid] === undefined) {
         console.error("Sweep SID(s) is invalid.");
         return;
     }
 
+    // loop Dijkstra's algorithm
+    // TODO: upgrade to A*
     const ht = {}; // hash table that stores the following info for each encountered sweep:
     ht[a_sid] = {"visited": false, "distance": 0, "parent": null};
-
-    // loop Dijkstra's algorithm
+    
     while (true) {
         // find unvisited sweep with minimum distance
-        // Note: this step is not efficient, but thats OK for now
+        // TODO: optimize with priority queue
         let min_sid,
             min_dist;
         const encountered_sids = Object.keys(ht);
@@ -110,18 +103,18 @@ function findShortestPath(a_sid, b_sid, adjList) {
     }
     // traverse graph back to starting point
     var sid = b_sid;
-    arr = [sid];
+    path = [sid];
     while (ht[sid].parent !== null) {
         sid = ht[sid].parent;
-        arr.push(sid);
+        path.push(sid);
     }
-    return arr;
+    return path;
 }
 
 // ----------------------------------------------------------------------------
 
 // Put model SID here
-const model_sid = 'CDnv6RJDQ3d';
+const modelSID = 'CDnv6RJDQ3d';
 
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
@@ -133,7 +126,7 @@ if (domain == 'localhost') {
 } else {
     console.log('Invalid domain name: '+domain)
 }
-showcase.src='bundle/showcase.html?m='+model_sid+'&play=1&qs=1&applicationKey='+key;
+showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
 
 // Path segment component factory
 
@@ -244,12 +237,11 @@ showcase.addEventListener('load', async function() {
     }
 
     // create node graph
-    const sweep_positions = {}; // object keeping track of sid: position pairs
+    const sweepPositions = {}; // object keeping track of sid: position pairs
     let adjList; // see `createGraph` for usage
     sdk.Model.getData().then( data => {
-        const sweeps = data.sweeps;
-        sweeps.map( x => {sweep_positions[x.sid] = x.position});
-        adjList = createGraph(sweeps);
+        data.sweeps.map( x => {sweepPositions[x.sid] = x.position});
+        adjList = createGraph(data.sweeps);
         console.log("Graph of sweep distances:", adjList);
     });
     
@@ -267,7 +259,7 @@ showcase.addEventListener('load', async function() {
         // clear all active nodes
         activeNodes.forEach(node => node.stop());
         activeNodes = [];
-        renderPath(sdk, activeNodes, sweep_positions, path);
+        renderPath(sdk, activeNodes, sweepPositions, path);
     });
 
     // track pointer position
