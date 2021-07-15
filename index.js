@@ -78,7 +78,7 @@ function heuristic(i_sid, j_sid, sweepPositions) {
 function penalty(i_sid, j_sid, sweepPositions) {
     // Additional penalty to avoid large vertical/horizontal jumps, if possible
     return ((sweepPositions[i_sid].y - sweepPositions[j_sid].y)/VERT_THRESHOLD)**4 
-        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD)**2;
+        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD);
 }
 
 /**
