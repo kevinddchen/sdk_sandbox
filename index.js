@@ -2,8 +2,6 @@ const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
 
-const modelSID = 'opSBz3SgMg3';
-
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
 const domain = document.location.hostname;
@@ -14,7 +12,31 @@ if (domain == 'localhost') {
 } else {
     console.log('Invalid domain name: '+domain)
 }
-showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
+
+// Get url params
+let queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+const defaultUrlParams = {
+    play: '1',
+    qs: '1',
+};
+
+for (const [k, v] of Object.entries(defaultUrlParams)) {
+    if (!urlParams.has(k)) {
+        queryString = queryString.concat(`&${k}=${v}`);
+    }
+}
+
+// id model id isn't specified, add default one
+const defaultModelId = 'opSBz3SgMg3';
+if (!urlParams.has('m')) {
+    // slice out '?' in queryString
+    queryString = `?m=${defaultModelId}&${queryString.slice(1)}`;
+}
+console.log(queryString);
+
+showcase.src=`bundle/showcase.html${queryString}&applicationKey=${key}`;
 
 // --- Pathfinding ------------------------------------------------------------
 
@@ -255,7 +277,7 @@ showcase.addEventListener('load', async function() {
     }
 
     // create node graph
-    data = await sdk.Model.getData();
+    const data = await sdk.Model.getData();
     const sweepPositions = {}; // hash table keeping track of sweep positions: `sweepPositions[sweep_sid] -> Vector3`
     data.sweeps.map( x => {sweepPositions[x.sid] = x.position});
     const adjList = createGraph(data.sweeps, sweepPositions); // see `createGraph` for usage
