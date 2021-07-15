@@ -2,9 +2,7 @@ const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
 
-// --- Params ---
-const modelSID = 'CDnv6RJDQ3d';
-const VERT_THRESHOLD = 1.0; // connect neighboring sweeps whose horizontal separation is less than this amount
+const modelSID = 'opSBz3SgMg3';
 
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
@@ -18,22 +16,13 @@ if (domain == 'localhost') {
 }
 showcase.src=`bundle/showcase.html?m=${modelSID}&play=1&qs=1&applicationKey=${key}`;
 
-// ----------------------------------------------------------------------------
+// --- Pathfinding ------------------------------------------------------------
 
-/**
- * Convenience function for printing points.
- */
-function pointToString(point) {
-    var x = point.x.toFixed(2);
-    var y = point.y.toFixed(2);
-    var z = point.z.toFixed(2);
-    return `(${x}, ${y}, ${z})`;
-}
+const VERT_THRESHOLD = 0.5; // penalize sweeps vertically separated by this distance, in meters
+const HORZ_THRESHOLD = 5.0; // penalize sweeps horizontally separated by this distance, in meters
 
-/**
- * Euclidean distance between two points.
- */
 function distance(p1, p2) {
+    // Euclidean distance between two points
     return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2);
 }
 
@@ -62,38 +51,50 @@ function createGraph(sweeps) {
     }
     return adjList;
 }
+    
+function heuristic(i_sid, j_sid, sweepPositions) {
+    // Heuristic function for A*. Just take Euclidean distance.
+    return distance(sweepPositions[i_sid], sweepPositions[j_sid]);
+}
+
+function penalty(i_sid, j_sid, sweepPositions) {
+    // Additional penalty to avoid large vertical/horizontal jumps, if possible
+    return ((sweepPositions[i_sid].y - sweepPositions[j_sid].y)/VERT_THRESHOLD)**4 
+        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD)**2;
+}
 
 /**
  * Find shortest path between two sweeps, connected by valid movements.
  * @param {string} a_sid SID of starting sweep
  * @param {string} b_sid SID of ending sweep
  * @param {*} adjList Graph of sweep distances, as returned by `createGraph`
- * @param {*} sweepPositions Hash table of sweep positions
+ * @param {*} sweepPositions Table of sweep positions
  * @returns Path represented by list of sweep SIDs (string) in reverse order, i.e. [b_sid, ..., a_sid]
  */
 function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
+
     // check SIDs are valid
     if (adjList[a_sid] === undefined || adjList[b_sid] === undefined) {
         console.error("Sweep SID(s) is invalid.");
         return;
     }
 
-    // loop Dijkstra's algorithm
-    // TODO: upgrade to A*
     const ht = {}; // hash table that stores the following info for each encountered sweep:
-    ht[a_sid] = {"visited": false, "distance": 0, "parent": null};
-    
+    ht[a_sid] = {"visited": false, "distance": 0, "cost": 0, "parent": null};
+
+    // loop A* algorithm
+    let debug_n = 0; // count number of iterations
+
     while (true) {
-        // find unvisited sweep with minimum distance
+        debug_n += 1;
+        // find unvisited sweep with minimum cost = distance  + heuristic
         // TODO: optimize with priority queue
-        let min_sid,
-            min_dist;
+        let min_sid;
         const encountered_sids = Object.keys(ht);
         for (let i=0; i<encountered_sids.length; i++) {
             const sid = encountered_sids[i];
-            if (!ht[sid].visited && (min_dist === undefined || ht[sid].distance < min_dist)) {
+            if (!ht[sid].visited && (min_sid === undefined || ht[sid].cost < ht[min_sid].cost)) {
                 min_sid = sid;
-                min_dist = ht[sid].distance;
             }
         }
         if (min_sid === undefined) {
@@ -104,22 +105,21 @@ function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
         if (min_sid === b_sid) {
             break;
         }
-        // add all neighbors to hash table
+        // add all neighbors of `min_sid`
         ht[min_sid].visited = true;
         const neighbor_sids = Object.keys(adjList[min_sid]);
         for (let i=0; i<neighbor_sids.length; i++) {
             const sid = neighbor_sids[i];
-            const dist = adjList[min_sid][sid];
-            if (Math.abs(sweepPositions[min_sid].y - sweepPositions[sid].y) > VERT_THRESHOLD) {
-                continue; // do not connect sweeps separated by 1 m vertically
-            }
+            const dist = ht[min_sid].distance + adjList[min_sid][sid];
+            const cost = dist + penalty(min_sid, sid, sweepPositions) + heuristic(sid, b_sid, sweepPositions);
             if (sid in ht) { // if sweep has been encountered
-                if (!ht[sid].visited && (ht[sid].distance > min_dist+dist)) { // if not visited, update parent and distance
+                if (!ht[sid].visited && (ht[sid].cost > cost)) { // if not visited and smaller cost, then update
                     ht[sid].parent = min_sid;
-                    ht[sid].distance = min_dist+dist;
+                    ht[sid].distance = dist;
+                    ht[sid].cost = cost;
                 }
             } else { // if sweep has not been encountered yet
-                ht[sid] = {"visited": false, "distance": min_dist+dist, "parent": min_sid};
+                ht[sid] = {"visited": false, "distance": dist, "cost": cost, "parent": min_sid};
             }
         }
     }
@@ -130,6 +130,7 @@ function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
         sid = ht[sid].parent;
         path.push(sid);
     }
+    console.log("Pathfind iterations: %d", debug_n);
     return path;
 }
 
@@ -231,6 +232,18 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
     node.start();
 }
 
+// ----------------------------------------------------------------------------
+
+/**
+ * Convenience function for printing points.
+ */
+ function pointToString(point) {
+    var x = point.x.toFixed(2);
+    var y = point.y.toFixed(2);
+    var z = point.z.toFixed(2);
+    return `(${x}, ${y}, ${z})`;
+}
+
 // Showcase runtime code
 
 showcase.addEventListener('load', async function() {
@@ -266,7 +279,7 @@ showcase.addEventListener('load', async function() {
             console.log(`current sweep SID: ${currSweep.sid}`);
 
             // pathfinding
-            const endSweepId = 'bdef2d34bf7642be9e514686a262c158';
+            const endSweepId = '5b6fac032d3a4068bd4febf7770c22ff';
             const path = findShortestPath(currSweep.sid, endSweepId, adjList, sweepPositions);
 
             if (node) node.stop();
