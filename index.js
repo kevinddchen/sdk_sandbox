@@ -27,26 +27,21 @@ function distance(p1, p2) {
 }
 
 /**
- * Generate graph of sweep distances. Assumes graph is undirected.
+ * Generate graph of sweep distances.
  * @param {*} sweeps List of sweeps, as returned by `sdk.Model.getData().sweeps`
+ * @param {*} sweepPositions Table of sweep positions
  * @returns The distance between two neighboring sweeps is obtained by `adjList[sweep_a_sid][sweep_b_sid]`
  */
-function createGraph(sweeps) {
+function createGraph(sweeps, sweepPositions) {
     const adjList = {};
-    const position_cache = {}; // keep track of encountered sweep positions
     for (let i=0; i<sweeps.length; i++) {
         const sweep_a = sweeps[i];
         adjList[sweep_a.sid] = {};
-        position_cache[sweep_a.sid] = sweep_a.position;
-
         const neighbor_sids = sweep_a.neighbors;
         for (let j=0; j<neighbor_sids.length; j++) {
             const sweep_b_sid = neighbor_sids[j];
-            if (sweep_b_sid in position_cache) { // if sweep already visited, we know its position
-                const d = distance(sweep_a.position, position_cache[sweep_b_sid]);
-                adjList[sweep_a.sid][sweep_b_sid] = d;
-                adjList[sweep_b_sid][sweep_a.sid] = d; // this only works if graph is undirected, i.e. A neighbor of B => B neighbor of A
-            }
+            const d = distance(sweep_a.position, sweepPositions[sweep_b_sid]);
+            adjList[sweep_a.sid][sweep_b_sid] = d;
         }
     }
     return adjList;
@@ -260,13 +255,10 @@ showcase.addEventListener('load', async function() {
     }
 
     // create node graph
+    data = await sdk.Model.getData();
     const sweepPositions = {}; // hash table keeping track of sweep positions: `sweepPositions[sweep_sid] -> Vector3`
-    let adjList; // see `createGraph` for usage
-    sdk.Model.getData().then( data => {
-        data.sweeps.map( x => {sweepPositions[x.sid] = x.position});
-        adjList = createGraph(data.sweeps);
-        console.log("Graph of sweep distances:", adjList);
-    });
+    data.sweeps.map( x => {sweepPositions[x.sid] = x.position});
+    const adjList = createGraph(data.sweeps, sweepPositions); // see `createGraph` for usage
     
     sdk.Scene.register('path', PathFactory); // register component
 
