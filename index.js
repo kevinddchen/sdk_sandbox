@@ -1,6 +1,7 @@
 const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
+const sweep_options = document.getElementById('sweep_options');
 
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
@@ -254,11 +255,55 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
 /**
  * Convenience function for printing points.
  */
- function pointToString(point) {
+function pointToString(point) {
     var x = point.x.toFixed(2);
     var y = point.y.toFixed(2);
     var z = point.z.toFixed(2);
     return `(${x}, ${y}, ${z})`;
+}
+
+/**
+ * Returns Euclidean distance between two points (object with x, y, z properties).
+ * Dumb because THREE.Vector3 already has this method, but sometimes points arent Vector3.
+ * @param {*} a First point
+ * @param {*} b Second point
+ */
+function dumbDistance(a, b) {
+    return Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2 + (b.z-a.z)**2);
+}
+
+/**
+ * Adds <option> tags to sweep_options for each sweep in the model
+ * @param {*} sweepData Object with sweep ids as keys
+ * @param {*} currSweep Sweep id of the current sweep
+ */
+async function updateOptions(sweepData, currSweep) {
+    const currVal = sweep_options.value;
+    // clear existing data
+    while (sweep_options.firstChild) {
+        sweep_options.removeChild(sweep_options.firstChild);
+    }
+    // add new data
+    const options = [];
+    for (const id of Object.keys(sweepData)) {
+        const option = document.createElement('option');
+        option.key = option.value = option.textContent = id;
+        let dist;
+        if (currSweep) {
+            // handle either { sweep: { position: { x,y,z }}} or { sweep: { x,y,z }}
+            const dest = sweepData[id].position ? sweepData[id].position : sweepData[id];
+            dist = dumbDistance(sweepData[currSweep].position ? sweepData[currSweep].point : sweepData[currSweep], dest);
+            option.textContent = option.textContent.concat(` (${Math.round(dist)}m)`)
+        }
+        options.push({ o: option, d: dist });
+    }
+    if (currSweep) {
+        // sort ascending distance
+        options.sort((a, b) => a.d - b.d);
+    }
+    sweep_options.appendChild(document.createElement('option')); // empty option
+    options.forEach(elt => sweep_options.appendChild(elt.o));
+    sweep_options.value = currVal;
 }
 
 // Showcase runtime code
@@ -283,8 +328,30 @@ showcase.addEventListener('load', async function() {
     const adjList = createGraph(data.sweeps, sweepPositions); // see `createGraph` for usage
     
     sdk.Scene.register('path', PathFactory); // register component
+    updateOptions(sweepPositions); // update dropdown
 
     let node; // variable to track active node
+    let currSweepId;
+    let destSweepId;
+
+
+    const handlePath = async function() {
+            if (currSweepId && destSweepId) {
+            const path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
+            if (node) node.stop();
+            node = await sdk.Scene.createNode();
+            renderPath(sdk, node, sweepPositions, path);
+        }
+        
+        updateOptions(sweepPositions, currSweepId);
+    }
+
+    // listen for changes to destination sweep option
+    sweep_options.addEventListener('change', e => {
+        console.log('change');
+        destSweepId = e.currentTarget.value;
+        handlePath();
+    })
 
     // track current sweep position
     sdk.Sweep.current.subscribe(async function(currSweep) {
@@ -292,13 +359,8 @@ showcase.addEventListener('load', async function() {
         if (currSweep.sid !== '') {
             console.log(`current sweep SID: ${currSweep.sid}`);
 
-            // pathfinding
-            const endSweepId = '5b6fac032d3a4068bd4febf7770c22ff';
-            const path = findShortestPath(currSweep.sid, endSweepId, adjList, sweepPositions);
-
-            if (node) node.stop();
-            node = await sdk.Scene.createNode();
-            renderPath(sdk, node, sweepPositions, path);
+            currSweepId = currSweep.sid;
+            handlePath();
         }
     });
 
@@ -306,6 +368,5 @@ showcase.addEventListener('load', async function() {
     sdk.Pointer.intersection.subscribe(function(interData) {
         point_pos.innerHTML = `pointer position: ${pointToString(interData.position)}`;
     });
-
 });
 
