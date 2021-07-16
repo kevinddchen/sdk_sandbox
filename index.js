@@ -41,8 +41,8 @@ showcase.src=`bundle/showcase.html${queryString}&applicationKey=${key}`;
 
 // --- Pathfinding ------------------------------------------------------------
 
-const VERT_THRESHOLD = 0.5; // penalize sweeps vertically separated by this distance, in meters
-const HORZ_THRESHOLD = 5.0; // penalize sweeps horizontally separated by this distance, in meters
+const VERT_THRESHOLD = 1.; // penalize sweeps vertically separated by this distance, in meters
+const HORZ_THRESHOLD = 10.0; // penalize sweeps horizontally separated by this distance, in meters
 
 function distance(p1, p2) {
     // Euclidean distance between two points
@@ -297,6 +297,8 @@ async function updateOptions(sweepData, currSweep) {
     sweep_options.value = currVal;
 }
 
+// ----------------------------------------------------------------------------
+
 // Showcase runtime code
 
 showcase.addEventListener('load', async function() {
@@ -325,15 +327,19 @@ showcase.addEventListener('load', async function() {
     let currSweepId;
     let destSweepId;
 
+    let path = [];
 
     const handlePath = async function() {
         if (currSweepId && destSweepId) {
+<<<<<<< HEAD
             const path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
+=======
+            path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
+>>>>>>> 769a8ad39635e1babde29166371d45fd482b4ead
             if (node) node.stop();
             node = await sdk.Scene.createNode();
             renderPath(sdk, node, sweepPositions, path);
         }
-        
         updateOptions(sweepPositions, currSweepId);
     }
 
