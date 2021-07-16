@@ -19,25 +19,18 @@ let queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 
 const defaultUrlParams = {
+    m: 'opSBz3SgMg3',
     play: '1',
     qs: '1',
 };
 
 for (const [k, v] of Object.entries(defaultUrlParams)) {
     if (!urlParams.has(k)) {
-        queryString = queryString.concat(`&${k}=${v}`);
+        queryString = queryString.concat(`${k}=${v}&`);
     }
 }
 
-// id model id isn't specified, add default one
-const defaultModelId = 'opSBz3SgMg3';
-if (!urlParams.has('m')) {
-    // slice out '?' in queryString
-    queryString = `?m=${defaultModelId}&${queryString.slice(1)}`;
-}
-console.log(queryString);
-
-showcase.src=`bundle/showcase.html${queryString}&applicationKey=${key}`;
+showcase.src=`bundle/showcase.html?${queryString}&applicationKey=${key}`;
 
 // --- Pathfinding ------------------------------------------------------------
 
@@ -175,7 +168,8 @@ function Path() {
         const { path,
                 radius,
                 heightOffset,
-                opacity, color,
+                opacity,
+                color,
                 stepMultiplier } = this.inputs;
 
         // check if path is long enough and no undefined points
@@ -263,16 +257,6 @@ function pointToString(point) {
 }
 
 /**
- * Returns Euclidean distance between two points (object with x, y, z properties).
- * Dumb because THREE.Vector3 already has this method, but sometimes points arent Vector3.
- * @param {*} a First point
- * @param {*} b Second point
- */
-function dumbDistance(a, b) {
-    return Math.sqrt((b.x-a.x)**2 + (b.y-a.y)**2 + (b.z-a.z)**2);
-}
-
-/**
  * Adds <option> tags to sweep_options for each sweep in the model
  * @param {*} sweepData Object with sweep ids as keys
  * @param {*} currSweep Sweep id of the current sweep
@@ -292,7 +276,7 @@ async function updateOptions(sweepData, currSweep) {
         if (currSweep) {
             // handle either { sweep: { position: { x,y,z }}} or { sweep: { x,y,z }}
             const dest = sweepData[id].position ? sweepData[id].position : sweepData[id];
-            dist = dumbDistance(sweepData[currSweep].position ? sweepData[currSweep].point : sweepData[currSweep], dest);
+            dist = distance(sweepData[currSweep].position ? sweepData[currSweep].point : sweepData[currSweep], dest);
             option.textContent = option.textContent.concat(` (${Math.round(dist)}m)`)
         }
         options.push({ o: option, d: dist });
