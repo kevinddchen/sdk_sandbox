@@ -331,11 +331,7 @@ showcase.addEventListener('load', async function() {
 
     const handlePath = async function() {
         if (currSweepId && destSweepId) {
-<<<<<<< HEAD
-            const path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
-=======
             path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
->>>>>>> 769a8ad39635e1babde29166371d45fd482b4ead
             if (node) node.stop();
             node = await sdk.Scene.createNode();
             renderPath(sdk, node, sweepPositions, path);
