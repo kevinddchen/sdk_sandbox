@@ -19,18 +19,25 @@ let queryString = window.location.search;
 const urlParams = new URLSearchParams(queryString);
 
 const defaultUrlParams = {
-    m: 'opSBz3SgMg3',
     play: '1',
     qs: '1',
 };
 
 for (const [k, v] of Object.entries(defaultUrlParams)) {
     if (!urlParams.has(k)) {
-        queryString = queryString.concat(`${k}=${v}&`);
+        queryString = queryString.concat(`&${k}=${v}`);
     }
 }
 
-showcase.src=`bundle/showcase.html?${queryString}&applicationKey=${key}`;
+// id model id isn't specified, add default one
+// keep separate from defaultUrlParams for now
+const defaultModelId = 'opSBz3SgMg3';
+if (!urlParams.has('m')) {
+    // slice out '?' in queryString
+    queryString = `?m=${defaultModelId}&${queryString.slice(1)}`;
+}
+
+showcase.src=`bundle/showcase.html${queryString}&applicationKey=${key}`;
 
 // --- Pathfinding ------------------------------------------------------------
 
@@ -71,7 +78,7 @@ function heuristic(i_sid, j_sid, sweepPositions) {
 function penalty(i_sid, j_sid, sweepPositions) {
     // Additional penalty to avoid large vertical/horizontal jumps, if possible
     return ((sweepPositions[i_sid].y - sweepPositions[j_sid].y)/VERT_THRESHOLD)**4 
-        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD);
+        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD)**2;
 }
 
 /**
