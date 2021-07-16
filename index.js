@@ -44,6 +44,11 @@ showcase.src=`bundle/showcase.html${queryString}&applicationKey=${key}`;
 const VERT_THRESHOLD = 1.; // penalize sweeps vertically separated by this distance, in meters
 const HORZ_THRESHOLD = 10.0; // penalize sweeps horizontally separated by this distance, in meters
 
+function distance(p1, p2) {
+    // Euclidean distance between two points
+    return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2);
+}
+
 /**
  * Generate graph of sweep distances.
  * @param {*} sweeps List of sweeps, as returned by `sdk.Model.getData().sweeps`
@@ -58,7 +63,7 @@ function createGraph(sweeps, sweepPositions) {
         const neighbor_sids = sweep_a.neighbors;
         for (let j=0; j<neighbor_sids.length; j++) {
             const sweep_b_sid = neighbor_sids[j];
-            const d = dumbDistance(sweep_a.position, sweepPositions[sweep_b_sid]);
+            const d = distance(sweep_a.position, sweepPositions[sweep_b_sid]);
             adjList[sweep_a.sid][sweep_b_sid] = d;
         }
     }
@@ -67,7 +72,7 @@ function createGraph(sweeps, sweepPositions) {
     
 function heuristic(i_sid, j_sid, sweepPositions) {
     // Heuristic function for A*. Just take Euclidean distance.
-    return dumbDistance(sweepPositions[i_sid], sweepPositions[j_sid]);
+    return distance(sweepPositions[i_sid], sweepPositions[j_sid]);
 }
 
 function penalty(i_sid, j_sid, sweepPositions) {
