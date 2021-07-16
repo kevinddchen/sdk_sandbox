@@ -243,8 +243,8 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
 
     node.addComponent('path', {
         path: sweepIds.map(id => sweepData[id]),
-        opacity: 0.6,
-        radius: 0.08,
+        opacity: 0.7,
+        radius: 0.12,
         stepMultiplier: 10,
         color: 0x8df763,
     });
@@ -327,7 +327,7 @@ showcase.addEventListener('load', async function() {
 
 
     const handlePath = async function() {
-            if (currSweepId && destSweepId) {
+        if (currSweepId && destSweepId) {
             const path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
             if (node) node.stop();
             node = await sdk.Scene.createNode();
