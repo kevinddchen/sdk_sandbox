@@ -2,6 +2,8 @@ const showcase = document.getElementById('showcase');
 const point_pos = document.getElementById('point_pos');
 const sweep_pos = document.getElementById('sweep_pos');
 const sweep_options = document.getElementById('sweep_options');
+const start_naviagation = document.getElementById('start_nagivation');
+const end_navigation = document.getElementById('end_navigation');
 
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
@@ -78,7 +80,7 @@ function heuristic(i_sid, j_sid, sweepPositions) {
 function penalty(i_sid, j_sid, sweepPositions) {
     // Additional penalty to avoid large vertical/horizontal jumps, if possible
     return ((sweepPositions[i_sid].y - sweepPositions[j_sid].y)/VERT_THRESHOLD)**4 
-        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD)**2;
+        +  (((sweepPositions[i_sid].x - sweepPositions[j_sid].x)**2 + (sweepPositions[i_sid].z - sweepPositions[j_sid].z)**2)/HORZ_THRESHOLD);
 }
 
 /**
@@ -152,7 +154,7 @@ function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
     return path;
 }
 
-// ----------------------------------------------------------------------------
+// --- Path Rendering ---------------------------------------------------------
 
 // Path segment component factory
 
@@ -251,7 +253,11 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
     node.start();
 }
 
-// ----------------------------------------------------------------------------
+// --- Navigation -------------------------------------------------------------
+
+
+
+// --- UI/UX ------------------------------------------------------------------
 
 /**
  * Convenience function for printing points.
@@ -323,11 +329,10 @@ showcase.addEventListener('load', async function() {
     sdk.Scene.register('path', PathFactory); // register component
     updateOptions(sweepPositions); // update dropdown
 
+    let path = [];
     let node; // variable to track active node
     let currSweepId;
     let destSweepId;
-
-    let path = [];
 
     const handlePath = async function() {
         if (currSweepId && destSweepId) {
@@ -337,6 +342,44 @@ showcase.addEventListener('load', async function() {
             renderPath(sdk, node, sweepPositions, path);
         }
         updateOptions(sweepPositions, currSweepId);
+    }
+
+    let camera;
+    let cameraComponent;
+    let fly_node;
+
+    const startNavigation = async function () {
+        if (currSweepId && destSweepId) {
+            await sdk.Scene.configure( function(renderer, three, effectComposer) {
+                camera = new three.PerspectiveCamera( 45, 1.333, 1, 1000 );
+                camera.position.copy(sweepPositions[currSweepId]);
+                camera.updateProjectionMatrix();
+            });
+            console.log(camera);
+            await sdk.Mode.moveTo(sdk.Mode.Mode.DOLLHOUSE, {
+                position: camera.position,
+                rotation: camera.rotation,
+                transition: sdk.Mode.TransitionType.FLY,
+            });
+            fly_node = await sdk.Scene.createNode();
+            cameraComponent = fly_node.addComponent('mp.camera', {
+                enabled: true,
+                camera: camera,
+            });
+            fly_node.start();
+            console.log(camera);
+            console.log(cameraComponent);
+            console.log(fly_node);
+            
+        } else {
+            console.log("No path.");
+        }
+    }
+
+    const endNavigation = async function() {
+        if (fly_node) {
+            fly_node.stop();
+        }
     }
 
     // listen for changes to destination sweep option
@@ -361,5 +404,14 @@ showcase.addEventListener('load', async function() {
     sdk.Pointer.intersection.subscribe(function(interData) {
         point_pos.innerHTML = `pointer position: ${pointToString(interData.position)}`;
     });
+
+    start_navigation.addEventListener('click', e => {
+        startNavigation();
+    });
+
+    end_navigation.addEventListener('click', e => {
+        endNavigation();
+    });
+
 });
 
