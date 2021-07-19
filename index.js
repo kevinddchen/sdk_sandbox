@@ -8,13 +8,8 @@ const end_navigation = document.getElementById('end_navigation');
 // Check if domain is `kevinddchen.github.io` or `localhost`, and pick SDK key accordingly
 let key;
 const domain = document.location.hostname;
-if (domain == 'localhost') {
-    key = 'e0iyprwgd7e7mckrhei7bwzza';
-} else if (domain == 'kevinddchen.github.io') {
-    key = 'q44m20q8yk81yi0qgixrremda';
-} else {
-    console.log('Invalid domain name: '+domain)
-}
+key = 'q44m20q8yk81yi0qgixrremda';
+console.error(`Invalid domain name '${domain}'.`);
 
 // Get url params
 let queryString = window.location.search;
@@ -89,7 +84,7 @@ function penalty(i_sid, j_sid, sweepPositions) {
  * @param {string} b_sid SID of ending sweep
  * @param {*} adjList Graph of sweep distances, as returned by `createGraph`
  * @param {*} sweepPositions Table of sweep positions
- * @returns Path represented by list of sweep SIDs (string) in reverse order, i.e. [b_sid, ..., a_sid]
+ * @returns Path represented by list of sweep SIDs (string), i.e. [a_sid, ..., b_sid]
  */
 function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
 
@@ -151,6 +146,7 @@ function findShortestPath(a_sid, b_sid, adjList, sweepPositions) {
         path.push(sid);
     }
     console.log("Pathfind iterations: %d", debug_n);
+    path.reverse();
     return path;
 }
 
@@ -170,6 +166,10 @@ function Path() {
         opacity: 0.5,
         heightOffset: -1,
         stepMultiplier: 5,
+    };
+
+    this.outputs = {
+        spline: null,
     };
  
     this.onInit = async function() {
@@ -210,6 +210,7 @@ function Path() {
         const pathMesh = new THREE.Mesh(extrudeGeometry, this.material)
 
         this.outputs.objectRoot = pathMesh;
+        this.outputs.spline = spline;
     };
  
     this.onEvent = function(type, data) {
@@ -243,7 +244,7 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
     // if anything is undefined or there is no multi-sweep path, return
     if (!sweepData || !sweepIds || sweepIds.length < 2) return;
 
-    node.addComponent('path', {
+    path = node.addComponent('path', {
         path: sweepIds.map(id => sweepData[id]),
         opacity: 0.7,
         radius: 0.12,
@@ -251,13 +252,78 @@ async function renderPath(sdk, node, sweepData, sweepIds) {
         color: 0x8df763,
     });
     node.start();
+    return path;
 }
 
 // --- Navigation -------------------------------------------------------------
 
+function CameraController() {
+    this.inputs = {
+        spline: null,
+        speed: 1., // speed in meters per second
+    };
 
+    this.outputs = {
+        camera: null,
+    };
 
-// --- UI/UX ------------------------------------------------------------------
+    this.onInit = function() {
+
+        THREE = this.context.three;
+        camera = new THREE.PerspectiveCamera( 45, 1.333, 1, 1000 );
+        
+        camera.position.copy(this.inputs.spline.getPoint(0));
+        camera.position.y += 1.5;
+        camera.updateProjectionMatrix();
+
+        this.outputs.camera = camera;
+
+        this.startTime = Date.now();
+        this.length = this.inputs.spline.getLength();
+        this.up = new THREE.Vector3(0, 1, 0);
+
+    };
+
+    this.onEvent = function(type, data) {
+    }
+
+    this.onInputsUpdated = function(previous) {
+    };
+
+    this.onTick = function(tickDelta) {
+        THREE = this.context.three;
+
+        time = (Date.now() - this.startTime)/1000;
+        tNow = this.inputs.speed * time / this.length;
+        tFuture = this.inputs.speed * (time + 1) / this.length;
+
+        // positions
+        currPos = this.inputs.spline.getPointAt(tNow);
+        futurePos = this.inputs.spline.getPointAt(tFuture);
+        console.log(currPos);
+        this.outputs.camera.position.copy(currPos);
+        this.outputs.camera.position.y += 1.5;
+
+        // rotation
+        matrix = new THREE.Matrix4().lookAt(currPos, futurePos, this.up);
+        console.log(matrix);
+        quaternion = new this.context.three.Quaternion().setFromRotationMatrix(matrix);
+        console.log(quaternion);
+        this.outputs.camera.quaternion.copy(quaternion);
+        console.log("yes");
+        this.outputs.camera.updateProjectionMatrix();
+
+    }
+
+    this.onDestroy = function() {
+    };
+}
+   
+function CameraControllerFactory() {
+    return new CameraController();
+}
+
+// --- UI ---------------------------------------------------------------------
 
 /**
  * Convenience function for printing points.
@@ -327,59 +393,42 @@ showcase.addEventListener('load', async function() {
     const adjList = createGraph(data.sweeps, sweepPositions); // see `createGraph` for usage
     
     sdk.Scene.register('path', PathFactory); // register component
+    sdk.Scene.register('cameraController', CameraControllerFactory);
     updateOptions(sweepPositions); // update dropdown
 
-    let path = [];
-    let node; // variable to track active node
+    let pathNode; 
+    let pathComponent;
     let currSweepId;
     let destSweepId;
 
     const handlePath = async function() {
         if (currSweepId && destSweepId) {
-            path = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
-            if (node) node.stop();
-            node = await sdk.Scene.createNode();
-            renderPath(sdk, node, sweepPositions, path);
+            let sweepPath = findShortestPath(currSweepId, destSweepId, adjList, sweepPositions);
+            if (pathNode) pathNode.stop();
+            pathNode = await sdk.Scene.createNode();
+            renderPath(sdk, pathNode, sweepPositions, sweepPath).then( (path) => {pathComponent = path} );
         }
         updateOptions(sweepPositions, currSweepId);
     }
 
-    let camera;
-    let cameraComponent;
-    let fly_node;
+    let flyNode;
 
-    const startNavigation = async function () {
-        if (currSweepId && destSweepId) {
-            await sdk.Scene.configure( function(renderer, three, effectComposer) {
-                camera = new three.PerspectiveCamera( 45, 1.333, 1, 1000 );
-                camera.position.copy(sweepPositions[currSweepId]);
-                camera.updateProjectionMatrix();
-            });
-            console.log(camera);
-            await sdk.Mode.moveTo(sdk.Mode.Mode.DOLLHOUSE, {
-                position: camera.position,
-                rotation: camera.rotation,
-                transition: sdk.Mode.TransitionType.FLY,
-            });
-            fly_node = await sdk.Scene.createNode();
-            cameraComponent = fly_node.addComponent('mp.camera', {
+    const startFly = async function () {
+        if (pathComponent) {
+            endFly();
+            flyNode = await sdk.Scene.createNode();
+            const camCon = flyNode.addComponent('cameraController');
+            const cam = flyNode.addComponent('mp.camera', {
                 enabled: true,
-                camera: camera,
             });
-            fly_node.start();
-            console.log(camera);
-            console.log(cameraComponent);
-            console.log(fly_node);
-            
-        } else {
-            console.log("No path.");
+            camCon.bind('spline', pathComponent, 'spline');
+            cam.bind('camera', camCon, 'camera');
+            flyNode.start();
         }
     }
 
-    const endNavigation = async function() {
-        if (fly_node) {
-            fly_node.stop();
-        }
+    const endFly = function() {
+        if (flyNode) flyNode.stop();
     }
 
     // listen for changes to destination sweep option
@@ -406,11 +455,11 @@ showcase.addEventListener('load', async function() {
     });
 
     start_navigation.addEventListener('click', e => {
-        startNavigation();
+        startFly();
     });
 
     end_navigation.addEventListener('click', e => {
-        endNavigation();
+        endFly();
     });
 
 });
