@@ -1,4 +1,4 @@
-# Note: this repo is depreciated. We have moved to react: https://github.com/nwager-mp/sdk_pathfinder
+# Note: this repo is deprecated. We have moved to react: https://github.com/nwager-mp/sdk_pathfinder
 
 # Matterport SDK Sandbox
 
